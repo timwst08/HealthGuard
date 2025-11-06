@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthGuard Demo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- 
+    ####################################################################
+    NEU: Meta-Tags für App-Icon und "Wie eine App"-Verhalten
+    ####################################################################
+    -->
+    
+    <!-- Sag dem Handy, dass es eine Web-App ist (versteckt UI-Elemente des Browsers) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <!-- Setzt den Titel, der unter dem Icon angezeigt wird -->
+    <meta name="apple-mobile-web-app-title" content="HealthGuard">
+    
+    <!-- 
+    Das ist das Icon! 
+    Ein SVG (Herz auf lila Grund) wurde in einen "Data URL" umgewandelt 
+    und hier direkt eingefügt.
+    -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%236d28d9%22%2F%3E%3Cpath%20fill%3D%22white%22%20d%3D%22M50%2085%20C-20%2040%2C%2025%2010%2C%2050%2035%20C75%2010%2C%20120%2040%2C%2050%2085%20Z%22%2F%3E%3C%2Fsvg%3E">
+    
+    <!-- Das ist das Icon speziell für Apple-Geräte (wird oft auch von Android genutzt) -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%236d28d9%22%2F%3E%3Cpath%20fill%3D%22white%22%20d%3D%22M50%2085%20C-20%2040%2C%2025%2010%2C%2050%2035%20C75%2010%2C%20120%2040%2C%2050%2085%20Z%22%2F%3E%3C%2Fsvg%3E">
+    
+    <!-- ################################################################## -->
+    
+
+    <style>
+        /* Verhindert Flackern beim Laden von D3 */
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthGuard Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js CDN -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            overflow-x: hidden; 
+        }
+        /* Custom gradient für die Hauptkarte */
+        .gradient-card {
+            background-image: linear-gradient(135deg, #a855f7 0%, #d946ef 50%, #f472b6 100%);
+        }
+        /* Custom gradient für die NEUE Prädiktions-Kachel (leicht angepasst) */
+        .gradient-prediction {
+            background-image: linear-gradient(90deg, #3b82f6 0%, #6366f1 100%);
+        }
+        /* NEU: Dynamische Gradienten für Prädiktion */
+        .gradient-prediction.status-low {
+             background-image: linear-gradient(90deg, #3b82f6 0%, #6366f1 100%); /* Blau/Lila */
+        }
+        .gradient-prediction.status-medium {
+            background-image: linear-gradient(90deg, #f97316 0%, #f59e0b 100%); /* Orange/Gelb */
+        }
+        .gradient-prediction.status-high {
+            background-image: linear-gradient(90deg, #dc2626 0%, #ef4444 100%); /* Rot */
+        }
+        
+        /* Basis-Stil für alle App-Ansichten */
+        .app-view {
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+            will-change: transform, opacity;
+            position: relative;
+        }
+        
+        /* Zustand, wenn eine Ansicht versteckt ist */
+        .view-hidden {
+            opacity: 0;
+            transform: translateX(10px);
+            pointer-events: none;
+            display: none;
+        }
+        
+        /* Zustand, wenn eine Ansicht aktiv wird */
+        .view-visible {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+            display: block;
+        }
+
+        /* Hover-Effekt für klickbare Karten */
+        .clickable-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .clickable-card:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+        }
+
+        /* Mobiles Menü Overlay */
+        #mobile-menu-overlay { transition: opacity 0.3s ease-in-out; }
+        #mobile-menu { transition: transform 0.3s ease-in-out; will-change: transform; }
+        .mobile-menu-hidden { opacity: 0; pointer-events: none; }
+        .mobile-menu-hidden #mobile-menu { transform: translateX(100%); }
+        .mobile-menu-visible { opacity: 1; pointer-events: auto; }
+        .mobile-menu-visible #mobile-menu { transform: translateX(0); }
+
+        /* Lade-Spinner für API-Aufrufe */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3b82f6; /* Blue */
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Mobiles Menü (Overlay) -->
+    <div id="mobile-menu-container" class="fixed inset-0 z-40 mobile-menu-hidden">
+        <div id="mobile-menu-overlay" class="fixed inset-0 bg-black/50"></div>
+        <nav id="mobile-menu" class="fixed top-0 right-0 h-full w-64 bg-white shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <span class="font-bold text-lg text-gray-800">Menü</span>
+                <button id="mobile-menu-close" class="text-gray-500 hover:text-gray-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="flex flex-col space-y-4">
+                <button data-view="report-view" class="mobile-menu-link flex items-center space-x-2 text-gray-700 hover:text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M9.667 1.583A.75.75 0 0 0 9 2.25v2.5a.75.75 0 0 0 1.5 0V3.366l.09.027a9.25 9.25 0 0 1 0 13.214l-.09.027v-1.366a.75.75 0 0 0-1.5 0v2.5a.75.75 0 0 0 .667.746 9.25 9.25 0 0 0 8.583-9.246 9.25 9.25 0 0 0-8.583-9.246Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M8 2.25a.75.75 0 0 0-1.5 0v2.5a.75.75 0 0 0 .667.746 9.25 9.25 0 0 0 0 11.508A.75.75 0 0 0 6.5 17.75v2.5a.75.75 0 0 0 1.5 0V18.634l-.09-.027a9.25 9.25 0 0 1 0-13.214l.09-.027V2.25Z" clip-rule="evenodd" /></svg>
+                    <span>Bericht</span>
+                </button>
+                <button data-view="share-view" class="mobile-menu-link flex items-center space-x-2 text-gray-700 hover:text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M13 4.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM10.5 6.5a.5.5 0 0 0-1 0v1.667l-3.084 1.322a.5.5 0 0 0-.249.613l.667 1.667a.5.5 0 0 0 .613.249L10 11.185l2.553.834a.5.5 0 0 0 .613-.249l.667-1.667a.5.5 0 0 0-.249-.613L10.5 8.167V6.5Z" /><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM9 5a1 1 0 1 1 2 0 1 1 0 0 1-2 0Z" clip-rule="evenodd" /></svg>
+                    <span>Teilen</span>
+                </button>
+                <button data-view="settings-view" class="mobile-menu-link flex items-center space-x-2 text-gray-700 hover:text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-1.007 1.11-1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c-.09.542-.56 1.007-1.11 1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41zM10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" /></svg>
+                    <span>Einstellungen</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-10">
+            <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <button id="logo-button" class="flex items-center space-x-2 cursor-pointer">
+                        <svg class="h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+                        <span class="font-bold text-xl text-gray-800">HealthGuard</span>
+                    </button>
+                    <div class="hidden sm:flex items-center space-x-4">
+                        <button id="report-button" class="flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M9.667 1.583A.75.75 0 0 0 9 2.25v2.5a.75.75 0 0 0 1.5 0V3.366l.09.027a9.25 9.25 0 0 1 0 13.214l-.09.027v-1.366a.75.75 0 0 0-1.5 0v2.5a.75.75 0 0 0 .667.746 9.25 9.25 0 0 0 8.583-9.246 9.25 9.25 0 0 0-8.583-9.246Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M8 2.25a.75.75 0 0 0-1.5 0v2.5a.75.75 0 0 0 .667.746 9.25 9.25 0 0 0 0 11.508A.75.75 0 0 0 6.5 17.75v2.5a.75.75 0 0 0 1.5 0V18.634l-.09-.027a9.25 9.25 0 0 1 0-13.214l.09-.027V2.25Z" clip-rule="evenodd" /></svg>
+                            <span>Bericht</span>
+                        </button>
+                        <button id="share-button" class="flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M13 4.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM10.5 6.5a.5.5 0 0 0-1 0v1.667l-3.084 1.322a.5.5 0 0 0-.249.613l.667 1.667a.5.5 0 0 0 .613.249L10 11.185l2.553.834a.5.5 0 0 0 .613-.249l.667-1.667a.5.5 0 0 0-.249-.613L10.5 8.167V6.5Z" /><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM9 5a1 1 0 1 1 2 0 1 1 0 0 1-2 0Z" clip-rule="evenodd" /></svg>
+                            <span>Teilen</span>
+                        </button>
+                        <button id="watch-button" class="flex items-center space-x-2 text-sm font-medium text-green-600 cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 1a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 1ZM10 18a.75.75 0 0 1 .75.75v.001a.75.75 0 0 1-1.5 0V18.75a.75.75 0 0 1 .75-.75ZM15.03 4.97a.75.75 0 0 1 0 1.06l-1.06 1.06a.75.75 0 0 1-1.06-1.06l1.06-1.06a.75.75 0 0 1 1.06 0ZM5.97 14.03a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 1 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0Zm11.21-4.28a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75ZM2.82 9.72a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75Zm11.21 4.28a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 0 1-1.06 1.06l-1.06-1.06a.75.75 0 0 1 0-1.06ZM5.97 5.97a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06L5.97 7.03a.75.75 0 0 1 0-1.06ZM10 5.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Z" clip-rule="evenodd" /></svg>
+                            <span>Smartwatch verbunden</span>
+                        </button>
+                        <button id="settings-button" class="text-gray-500 hover:text-gray-800 cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-1.007 1.11-1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c-.09.542-.56 1.007-1.11 1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41zM10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" /></svg>
+                        </button>
+                    </div>
+                    <div class="sm:hidden">
+                        <button id="mobile-menu-open" class="text-gray-500 hover:text-gray-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Haupt-Container für Ansichten -->
+        <div class="flex-grow relative">
+
+            <!-- #################################### -->
+            <!-- #####  DASHBOARD-ANSICHT      ###### -->
+            <!-- #################################### -->
+            <main id="dashboard-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-visible">
+                <div class="space-y-6">
+                    <!-- NEUE USP-KACHEL (Prädiktive Analyse) -->
+                    <!-- Die Klasse 'status-low' wird dynamisch per JS geändert -->
+                    <div id="predictive-analysis-button" class="gradient-prediction status-low text-white p-4 rounded-lg flex items-center justify-between shadow-lg clickable-card">
+                        <div class="flex items-center space-x-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                            <div>
+                                <h3 class="font-semibold">Prädiktive Gesundheitsanalyse</h3>
+                                <!-- Dieser Text wird jetzt dynamisch von renderHealthData() gesetzt -->
+                                <p id="analysis-text-content" class="text-sm opacity-90">Status: Geringes Risiko. Leichte Abweichungen im Herz-Kreislauf-Muster erkannt.</p>
+                                <p class="text-xs opacity-70">Zuletzt analysiert: vor 5 Minuten</p>
+                            </div>
+                        </div>
+                        <span class="text-sm font-medium flex items-center space-x-1 opacity-90">
+                            <span>Details</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                        </span>
+                    </div>
+
+                    <!-- Haupt-Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        <!-- Linke Spalte -->
+                        <div class="lg:col-span-2 space-y-6">
+                            <!-- Gesundheitsccore (Dies ist der 'HEUTE'-Score) -->
+                            <div id="score-details-button" class="gradient-card text-white p-6 rounded-lg shadow-xl flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-6 clickable-card">
+                                <div class="flex-shrink-0">
+                                    <span class="text-sm font-medium uppercase opacity-90">Ihr Gesundheitsccore (Heute)</span>
+                                    <div class="flex items-baseline space-x-2">
+                                        <span id="live-score" class="text-7xl font-bold">87</span>
+                                        <span class="text-3xl font-medium opacity-80">/ 100</span>
+                                    </div>
+                                    <p class="text-sm opacity-90 max-w-xs">Ausgezeichnet! Ihre Vitalwerte liegen im optimalen Bereich.</p>
+                                    <div class="mt-4 flex items-center space-x-4">
+                                        <span id="live-score-change" class="inline-flex items-center space-x-1 bg-white/20 rounded-full px-3 py-1 text-sm font-medium">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg>
+                                            <span>+5% diese Woche</span>
+                                        </span>
+                                        <span class="text-sm font-medium flex items-center space-x-1 opacity-90">
+                                            <span>Details ansehen</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="w-full md:w-64 h-64 flex-shrink-0"><svg id="radar-chart" class="w-full h-full"></svg></div>
+                            </div>
+                            <!-- Herzfrequenz Verlauf (Daten-Grundlage) -->
+                            <div class="bg-white p-6 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-4">Herzfrequenz Verlauf (24h)</h3>
+                                <div class="h-64"><svg id="hrv-chart" class="w-full h-full"></svg></div>
+                            </div>
+                            
+                            <!-- Tägliche Aktivität (Daten-Grundlage) -->
+                            <div class="bg-white p-6 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-4">Tägliche Aktivität</h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div id="steps-card-button" class="bg-green-50 p-4 rounded-lg flex items-start space-x-3 clickable-card">
+                                        <div class="bg-green-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-600"><path fill-rule="evenodd" d="M10.75 3.065A1.75 1.75 0 0 0 9 4.815V6.5a.75.75 0 0 1-1.5 0V4.815a3.25 3.25 0 0 1 5.46-2.012l.144.288a.75.75 0 0 1-1.354.676l-.144-.288a1.75 1.75 0 0 0-1.752-.428ZM8.11 8.11a.75.75 0 0 1 .638-.804A1.75 1.75 0 0 1 10.5 9v.25a.75.75 0 0 1-1.5 0V9a.25.25 0 0 0-.25-.25.75.75 0 0 1-.64-.84Zm-2.3 1.67a.75.75 0 0 1 1.023-.927 1.75 1.75 0 0 1 2.004-.543.75.75 0 0 1 .804.638 3.25 3.25 0 0 1-3.46 3.012l-.144-.288a.75.75 0 0 1 1.354-.676l.144.288a1.75 1.75 0 0 0 1.752.428.75.75 0 0 1 .64.84 3.25 3.25 0 0 1-5.46 2.012l-.144-.288a.75.75 0 1 1 1.354-.676l.144.288a1.75 1.75 0 0 0 2.004-.543.75.75 0 0 1 1.023-.927Z" clip-rule="evenodd" /></svg></div>
+                                        <div><span class="text-sm font-medium text-gray-500">Schritte</span>
+                                            <p id="live-steps-kachel" class="text-2xl font-semibold text-gray-900">8.432</p>
+                                            <span id="live-steps-goal" class="text-xs text-gray-500">von 10.000 Ziel</span>
+                                        </div>
+                                    </div>
+                                    <div id="calories-card-button" class="bg-orange-50 p-4 rounded-lg flex items-start space-x-3 clickable-card">
+                                        <div class="bg-orange-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-orange-600"><path fill-rule="evenodd" d="M11.78 2.22a.75.75 0 0 1 .22.53v1.365a.75.75 0 0 1-.416.675C10.932 5.11 9.61 5.5 8.5 5.5c-1.076 0-2.131-.36-2.93-.873a.75.75 0 0 1-.416-.675V2.75a.75.75 0 0 1 .75-.75c.19 0 .37.07.51.19l.01.01c.784.63 1.8.95 2.83.95s2.046-.32 2.83-.95l.01-.01a.75.75 0 0 1 .73-.72Zm-3.03 1.155a3.25 3.25 0 0 1 1.75 0C11.134 3.653 11.75 4.51 11.75 5.5c0 .99-.616 1.847-1.5 2.122V9.25a.75.75 0 0 1-1.5 0V7.622C7.866 7.347 7.25 6.49 7.25 5.5c0-.99.616-1.847 1.5-2.122Z" clip-rule="evenodd" /><path d="M10 18a.75.75 0 0 0 .75-.75V9.673a.75.75 0 0 0-.323-.629A3.001 3.001 0 0 1 10 9c-.394 0-.77.071-1.112.203a.75.75 0 0 0-.323.629V17.25A.75.75 0 0 0 10 18Z" /><path d="M10 18c-3.05 0-5.738-1.5-7.25-3.845a.75.75 0 0 1 .637-1.08C4.13 13.02 5.412 13 6.9 13c1.61 0 3.014.025 3.999-.08a.75.75 0 0 1 .8.653C11.91 16.32 11.235 18 10 18Z" /></svg></div>
+                                        <div><span class="text-sm font-medium text-gray-500">Kalorien</span>
+                                            <p id="live-calories-kachel" class="text-2xl font-semibold text-gray-900">2145</p>
+                                            <span class="text-xs text-gray-500">kcal verbrannt</span>
+                                        </div>
+                                    </div>
+                                    <div id="active-card-button" class="bg-sky-50 p-4 rounded-lg flex items-start space-x-3 clickable-card">
+                                        <div class="bg-sky-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-sky-600"><path fill-rule="evenodd" d="M10 1.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 1.5ZM5.503 4.24a.75.75 0 0 1 .958-.415l1.41 1.059a.75.75 0 0 1-.543 1.373l-1.41-1.059a.75.75 0 0 1-.415-.958ZM14.497 4.24a.75.75 0 0 1 .415.958l-1.41 1.059a.75.75 0 1 1-.543-1.373l1.41-1.059a.75.75 0 0 1 .128-.085Zm-1.18 5.46a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM4.25 10a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM10 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /><path d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM10 15c-4.414 0-8.108-2.68-8.918-6.195a.75.75 0 0 1 1.48-.31C3.308 11.63 6.368 13.5 10 13.5s6.692-1.87 7.438-5.006a.75.75 0 0 1 1.48.31C18.108 12.32 14.414 15 10 15Z" /></svg></div>
+                                        <div><span class="text-sm font-medium text-gray-500">Aktiv</span>
+                                            <p id="live-active-kachel" class="text-2xl font-semibold text-gray-900">67</p>
+                                            <span class="text-xs text-gray-500">Minuten</span>
+                                        </div>
+                                    </div>
+                                    <div id="distance-card-button" class="bg-purple-50 p-4 rounded-lg flex items-start space-x-3 clickable-card">
+                                        <div class="bg-purple-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-purple-600"><path fill-rule="evenodd" d="m9.677 2.012 5.5 1.618a.75.75 0 0 1 .58.736v9.268a.75.75 0 0 1-1.196.634l-4.756-2.854a.75.75 0 0 0-.612 0l-4.756 2.854a.75.75 0 0 1-1.196-.634V4.366a.75.75 0 0 1 .58-.736l5.5-1.618a.75.75 0 0 1 .612 0Z" clip-rule="evenodd" /></svg></div>
+                                        <div><span class="text-sm font-medium text-gray-500">Distanz</span>
+                                            <p id="live-distance-kachel" class="text-2xl font-semibold text-gray-900">6.2</p>
+                                            <span class="text-xs text-gray-500">Kilometer</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rechte Spalte (Daten-Grundlage) -->
+                        <div class="lg:col-span-1 space-y-6">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div id="hr-card-button" class="bg-white p-4 rounded-lg shadow clickable-card">
+                                    <div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-500">Herzfrequenz</span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-red-500"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg></div>
+                                    <span id="live-hr-kachel" class="text-3xl font-semibold text-gray-900">68</span><span class="text-sm ml-1">BPM</span>
+                                    <p id="live-hr-kachel-minmax" class="text-xs text-gray-400 mt-2">Min: 58 • Max: 145</p>
+                                </div>
+                                <div id="bp-card-button" class="bg-white p-4 rounded-lg shadow clickable-card">
+                                    <div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-500">Blutdruck</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-blue-500"><path d="M10.362 1.69a.75.75 0 0 0-1.071-.237L5.34 4.045A1.75 1.75 0 0 0 4.25 5.6v1.45c0 3.61 2.468 6.94 5.857 8.35a.75.75 0 0 0 .286 0c3.389-1.41 5.857-4.74 5.857-8.35V5.6a1.75 1.75 0 0 0-1.09-1.555l-3.951-2.592a.75.75 0 0 0-.824-.037Z" /><path d="M9.69 6.69a.75.75 0 0 1 1.06 0l1.25 1.25a.75.75 0 1 1-1.06 1.06L10.5 8.56V12a.75.75 0 0 1-1.5 0V8.56l-.44.44a.75.75 0 0 1-1.06-1.06l1.25-1.25Z" /></svg></div>
+                                    <span id="live-bp-kachel" class="text-3xl font-semibold text-gray-900">118/78</span><span class="text-sm ml-1">mmHg</span>
+                                </div>
+                                <div id="spo2-card-button" class="bg-white p-4 rounded-lg shadow clickable-card">
+                                    <div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-500">SpO2</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-teal-500"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-11.25a.75.75 0 0 0-1.5 0v2.25h-2.25a.75.75 0 0 0 0 1.5h2.25v2.25a.75.75 0 0 0 1.5 0v-2.25h2.25a.75.75 0 0 0 0-1.5h-2.25V6.75Z" clip-rule="evenodd" /></svg></div>
+                                    <span id="live-spo2-kachel" class="text-3xl font-semibold text-gray-900">98</span><span class="text-sm ml-1">%</span><p class="text-xs text-gray-400 mt-2">Sauerstoffsättigung</p>
+                                </div>
+                                <div id="temp-card-button" class="bg-white p-4 rounded-lg shadow clickable-card">
+                                    <div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-500">Temperatur</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-orange-500"><path d="M10 12.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Z" /><path fill-rule="evenodd" d="M10 2a.75.75 0 0 1 .75.75v6.586l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L6.22 8.426a.75.75 0 1 1 1.06-1.06l1.97 1.97V2.75A.75.75 0 0 1 10 2Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-1.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z" clip-rule="evenodd" /></svg></div>
+                                    <span id="live-temp-kachel" class="text-3xl font-semibold text-gray-900">36.7</span><span class="text-sm ml-1">°C</span><p class="text-xs text-gray-400 mt-2">Körpertemperatur</p>
+                                </div>
+                            </div>
+                            <!-- Schlafanalyse (Daten-Grundlage) -->
+                            <div id="sleep-card-button" class="bg-white p-6 rounded-lg shadow clickable-card">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-4">Schlafanalyse</h3>
+                                <p class="text-3xl font-semibold text-gray-900"><span id="live-sleep-hours">7.5</span> <span class="text-xl font-medium text-gray-500">Stunden</span></p><p class="text-sm text-gray-500">Gesamtschlaf</p>
+                                <div class="mt-4 space-y-2"><div class="flex justify-between items-center"><span class="text-sm font-medium text-gray-700">Schlafqualität</span><span id="live-sleep-quality" class="text-sm font-semibold text-indigo-600">82%</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div id="live-sleep-quality-bar" class="bg-indigo-500 h-2 rounded-full" style="width: 82%"></div></div></div>
+                                <div class="mt-4 w-full bg-gray-100 rounded-full h-3 flex overflow-hidden">
+                                    <div id="live-sleep-deep-bar" class="bg-blue-800 h-full" style="width: 33.3%"></div>
+                                    <div id="live-sleep-rem-bar" class="bg-blue-500 h-full" style="width: 21.3%"></div>
+                                    <div id="live-sleep-light-bar" class="bg-blue-300 h-full" style="width: 45.4%"></div>
+                                </div>
+                                <div class="mt-2 grid grid-cols-3 gap-2 text-center">
+                                    <div><span class="block text-xs text-gray-500">Tiefschlaf</span><span id="live-sleep-deep-text" class="block text-sm font-semibold text-blue-800">2.5h</span></div>
+                                    <div><span class="block text-xs text-gray-500">REM</span><span id="live-sleep-rem-text" class="block text-sm font-semibold text-blue-500">1.6h</span></div>
+                                    <div><span class="block text-xs text-gray-500">Leicht</span><span id="live-sleep-light-text" class="block text-sm font-semibold text-blue-300">3.2h</span></div>
+                                </div>
+                            </div>
+                            <!-- Stress & Empfehlungen (bleibt als Widget) -->
+                            <div class="bg-white p-6 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-4">Heutige Empfehlungen</h3>
+                                <div class="mb-4"><div class="flex justify-between items-baseline mb-1"><span class="text-sm font-medium text-gray-700">Stresslevel</span><span id="live-stress-label" class="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Niedrig</span></div>
+                                    <div class="flex items-baseline space-x-1">
+                                        <span id="live-stress-level" class="text-3xl font-semibold text-gray-900">35</span>
+                                        <span class="text-base font-medium text-gray-500">/ 100</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                        <div id="live-stress-bar" class="bg-green-500 h-1.5 rounded-full" style="width: 35%"></div>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex items-start space-x-3"><div class="bg-blue-100 p-2 rounded-full mt-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-blue-600"><path fill-rule="evenodd" d="M10.75 3.065A1.75 1.75 0 0 0 9 4.815V6.5a.75.75 0 0 1-1.5 0V4.815a3.25 3.25 0 0 1 5.46-2.012l.144.288a.75.75 0 0 1-1.354.676l-.144-.288a1.75 1.75 0 0 0-1.752-.428ZM8.11 8.11a.75.75 0 0 1 .638-.804A1.75 1.75 0 0 1 10.5 9v.25a.75.75 0 0 1-1.5 0V9a.25.25 0 0 0-.25-.25.75.75 0 0 1-.64-.84Zm-2.3 1.67a.75.75 0 0 1 1.023-.927 1.75 1.75 0 0 1 2.004-.543.75.75 0 0 1 .804.638 3.25 3.25 0 0 1-3.46 3.012l-.144-.288a.75.75 0 0 1 1.354-.676l.144.288a1.75 1.75 0 0 0 1.752.428.75.75 0 0 1 .64.84 3.25 3.25 0 0 1-5.46 2.012l-.144-.288a.75.75 0 1 1 1.354-.676l.144.288a1.75 1.75 0 0 0 2.004-.543.75.75 0 0 1 1.023-.927Z" clip-rule="evenodd" /></svg></div><div><h4 class="font-semibold text-sm text-gray-800">Bewegung empfohlen</h4><p class="text-sm text-gray-500">30 Minuten Spaziergang für besseren Schlaf</p></div></div>
+                                    <div class="flex items-start space-x-3"><div class="bg-teal-100 p-2 rounded-full mt-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-teal-600"><path fill-rule="evenodd" d="m10.832 2.206 4.385 4.385a.86.86 0 0 1 .238.618v8.038a.86.86 0 0 1-.238.618l-4.385 4.385a.86.86 0 0 1-.618.238H5.786a.86.86 0 0 1-.618-.238L.783 15.865a.86.86 0 0 1-.238-.618V7.209a.86.86 0 0 1 .238-.618L5.168 2.206a.86.86 0 0 1 .618-.238h4.428a.86.86 0 0 1 .618.238ZM9 5.5a.5.5 0 0 1 .5.5v2.768a.5.5 0 0 1-.146.353l-1.647 1.647a.5.5 0 0 1-.707-.707l1.5-1.5V6a.5.5 0 0 1 .5-.5Z" clip-rule="evenodd" /><path d="M12.5 11.25a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" /></svg></div><div><h4 class="font-semibold text-sm text-gray-800">Hydration</h4><p class="text-sm text-gray-500">Trinken Sie mindestens 2L Wasser heute</p></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div> <!-- Ende Haupt-Grid -->
+                </div>
+            </main>
+
+            <!-- #################################### -->
+            <!-- #####  DER NEUE USP-SCREEN    ###### -->
+            <!-- #####  PRÄDIKTIVE ANALYSE     ###### -->
+            <!-- #################################### -->
+            <main id="predictive-analysis-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <!-- Zurück-Button -->
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                        <span>Zurück zum Dashboard</span>
+                    </button>
+                    
+                    <!-- Header -->
+                    <div class="flex items-center space-x-3 mb-4">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 text-blue-600">
+                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                         </svg>
+                        <h1 class="text-2xl font-bold text-gray-900">Prädiktive Gesundheitsanalyse</h1>
+                    </div>
+                    
+                    <!-- Gesamtstatus (dynamisch) -->
+                    <!-- Die Klassen (bg-yellow-50 etc.) werden dynamisch per JS gesetzt -->
+                    <div id="analysis-status-box" class="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg mb-6">
+                        <h2 id="analysis-status-title" class="font-bold text-lg">Status: Geringes Risiko</h2>
+                        <!-- Dieser Text wird jetzt dynamisch von renderHealthData() gesetzt -->
+                        <p id="analysis-text-content-detail" class="text-sm">Ihre Gesundheitsdaten sind insgesamt stabil. Unser Algorithmus hat eine leichte, langfristige Tendenz zu erhöhtem Blutdruck festgestellt, die derzeit nicht besorgniserregend ist, aber über die nächsten Monate beobachtet werden sollte.</p>
+                    </div>
+
+                    <!-- Aufschlüsselung nach Systemen -->
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Analyse nach Körpersystemen</h3>
+                    <div class="space-y-4">
+                        <!-- Herz-Kreislauf -->
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-gray-800">Herz-Kreislauf-System</span>
+                                <span id="analysis-detail-cardio" class="text-sm font-medium text-yellow-600">Geringes Risiko</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">Langfrist-Prognose: Stabil. Leichte Muster in der Ruheherzfrequenz deuten auf eine beginnende Tendenz zu Bluthochdruck hin (Prognose: 3-5 Jahre).</p>
+                        </div>
+                        <!-- Stoffwechsel -->
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-gray-800">Stoffwechsel</span>
+                                <span id="analysis-detail-metabolism" class="text-sm font-medium text-green-600">Sehr geringes Risiko</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">Keine Anzeichen für metabolische Störungen. Aktivitäts- und Schlafdaten sind positiv.</p>
+                        </div>
+                        <!-- Nervensystem -->
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-gray-800">Autonomes Nervensystem</span>
+                                <span id="analysis-detail-nervous" class="text-sm font-medium text-green-600">Sehr geringes Risiko</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">HRV- und Schlafdaten deuten auf eine gute Balance und Erholungsfähigkeit hin.</p>
+                        </div>
+                    </div>
+
+                    <!-- Was bedeutet das? -->
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Was bedeutet das? (Demo-Info)</h3>
+                        <p id="analysis-detail-explanation" class="text-gray-600 text-sm mb-4">
+                            Unser Algorithmus analysiert Muster, die über Wochen und Monate entstehen. Die "leichte Tendenz" beim Blutdruck basiert auf einer minimalen (durchschnittlich +2 BPM), aber konsistenten Erhöhung Ihrer Morgen-Ruheherzfrequenz im Vergleich zu den Vormonaten.
+                        </p>
+                        <p class="text-gray-600 text-sm font-semibold">
+                            Dies ist <span class="text-red-600">keine</span> Diagnose, sondern ein proaktiver Hinweis, um auf Ihren Blutdruck zu achten.
+                        </p>
+                    </div>
+
+                    <!-- Empfehlungen -->
+                    <div class="mt-6 border-t pt-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Proaktive Empfehlungen</h3>
+                            <button id="play-tts-button" class="hidden flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                  <path d="M7.16 3.08A7.25 7.25 0 1 0 12.84 16.92A7.25 7.25 0 0 0 7.16 3.08ZM10 18a6.25 6.25 0 1 1 0-12.5 6.25 6.25 0 0 1 0 12.5Z" />
+                                  <path d="M10 5.5a.75.75 0 0 0-1.5 0v5.69l-1.97-1.97a.75.75 0 1 0-1.06 1.06l3.25 3.25a.75.75 0 0 0 1.06 0l3.25-3.25a.75.75 0 1 0-1.06-1.06L11.5 11.19V5.5a.75.75 0 0 0-1.5 0Z" />
+                                </svg>
+                                <span id="play-tts-button-text">Anhören</span>
+                            </button>
+                        </div>
+
+                        <!-- Lade-Spinner für Empfehlungen -->
+                        <div id="recommendations-loader" class="hidden flex items-center justify-center py-4">
+                            <div class="loader"></div>
+                            <p class="ml-3 text-gray-500">Analysiere und generiere Ratschläge...</p>
+                        </div>
+                        
+                        <!-- Button zum Generieren -->
+                        <div id="recommendations-button-container" class="flex justify-center">
+                            <button id="generate-recommendations-button" class="w-full sm:w-auto flex items-center justify-center space-x-2 bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700 clickable-card">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                  <path fill-rule="evenodd" d="M10 1.5a.75.75 0 0 1 .75.75V3a.75.75 0 0 1-1.5 0V1.5A.75.75 0 0 1 10 1.5Zm0 13.5a.75.75 0 0 1 .75.75V17a.75.75 0 0 1-1.5 0v-1.25a.75.75 0 0 1 .75-.75Zm7.06-6.06a.75.75 0 0 1 0 1.06l-.884.884a.75.75 0 1 1-1.06-1.06l.884-.884a.75.75 0 0 1 1.06 0ZM3.828 4.89a.75.75 0 0 1 1.06 0l.884.884a.75.75 0 1 1-1.06 1.06L3.828 5.95A.75.75 0 0 1 3.828 4.89Zm12.344 1.06a.75.75 0 0 1 1.06 0l.884.884a.75.75 0 1 1-1.06 1.06l-.884-.884a.75.75 0 0 1 0-1.06ZM4.89 15.107a.75.75 0 0 1 0-1.06l.884-.884a.75.75 0 1 1 1.06 1.06l-.884.884a.75.75 0 0 1-1.06 0Zm11.314-1.06a.75.75 0 0 1 0 1.06l-.884.884a.75.75 0 1 1-1.06-1.06l.884-.884a.75.75 0 0 1 1.06 0ZM3.828 10.75a.75.75 0 0 1 .75-.75h1.25a.75.75 0 0 1 0 1.5H4.578a.75.75 0 0 1-.75-.75Zm11.364 0a.75.75 0 0 1 .75-.75h1.25a.75.75 0 0 1 0 1.5h-1.25a.75.75 0 0 1-.75-.75Zm-4.242 3.53a.75.75 0 0 1 1.06 0l.884.884a.75.75 0 1 1-1.06 1.06l-.884-.884a.75.75 0 0 1 0-1.06Zm-1.06-1.06a.75.75 0 0 1 0-1.06L10.75 9.3l-.884-.884a.75.75 0 1 1 1.06-1.06l.884.884a.75.75 0 0 1 0 1.06L10 13.25a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" />
+                                </svg>
+                                <span>✨ Empfehlungen generieren</span>
+                            </button>
+                        </div>
+
+                        <!-- Hier werden die generierten Empfehlungen angezeigt -->
+                        <div id="recommendations-result" class="space-y-3">
+                            <!-- Statischer Inhalt entfernt -->
+                        </div>
+                    </div>
+                </div>
+            </main>
+            
+            
+            <!-- #################################### -->
+            <!-- #####  STANDARD-DETAILSEITEN  ###### -->
+            <!-- #################################### -->
+
+            <!-- Herzfrequenz Detailseite -->
+            <main id="hr-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-red-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-red-500"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Herzfrequenz</h1>
+                    </div>
+                    <p class="text-4xl font-bold text-gray-900 mb-2"><span id="live-hr-detail">68</span> <span class="text-2xl font-medium text-gray-500">BPM</span></p>
+                    <p id="live-hr-detail-minmax" class="text-sm text-gray-500 mb-6">Ihr aktueller Ruhepuls. Min: 58, Max: 145 (heute).</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Herzfrequenz-Diagramm</p></div>
+                </div>
+            </main>
+            
+            <!-- Blutdruck Detailseite -->
+            <main id="bp-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-blue-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-blue-500"><path d="M10.362 1.69a.75.75 0 0 0-1.071-.237L5.34 4.045A1.75 1.75 0 0 0 4.25 5.6v1.45c0 3.61 2.468 6.94 5.857 8.35a.75.75 0 0 0 .286 0c3.389-1.41 5.857-4.74 5.857-8.35V5.6a1.75 1.75 0 0 0-1.09-1.555l-3.951-2.592a.75.75 0 0 0-.824-.037Z" /><path d="M9.69 6.69a.75.75 0 0 1 1.06 0l1.25 1.25a.75.75 0 1 1-1.06 1.06L10.5 8.56V12a.75.75 0 0 1-1.5 0V8.56l-.44.44a.75.75 0 0 1-1.06-1.06l1.25-1.25Z" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Blutdruck</h1>
+                    </div>
+                    <p id="live-bp-detail" class="text-4xl font-bold text-gray-900 mb-2">118 / 78 <span class="text-2xl font-medium text-gray-500">mmHg</span></p>
+                    <p class="text-sm text-gray-500 mb-6">Letzte Messung vor 15 Minuten.</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Blutdruck-Diagramm</p></div>
+                </div>
+            </main>
+            
+            <!-- SpO2 Detailseite -->
+            <main id="spo2-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-teal-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-teal-500"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-11.25a.75.75 0 0 0-1.5 0v2.25h-2.25a.75.75 0 0 0 0 1.5h2.25v2.25a.75.75 0 0 0 1.5 0v-2.25h2.25a.75.75 0 0 0 0-1.5h-2.25V6.75Z" clip-rule="evenodd" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">SpO2</h1>
+                    </div>
+                    <p id="live-spo2-detail" class="text-4xl font-bold text-gray-900 mb-2">98 <span class="text-2xl font-medium text-gray-500">%</span></p>
+                    <p class="text-sm text-gray-500 mb-6">Sauerstoffsättigung im Normalbereich.</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes SpO2-Diagramm</p></div>
+                </div>
+            </main>
+
+            <!-- Temperatur Detailseite -->
+            <main id="temp-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-orange-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-orange-500"><path d="M10 12.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5a.75.75 0 0 1 .75.75Z" /><path fill-rule="evenodd" d="M10 2a.75.75 0 0 1 .75.75v6.586l1.97-1.97a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L6.22 8.426a.75.75 0 1 1 1.06-1.06l1.97 1.97V2.75A.75.75 0 0 1 10 2Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-1.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z" clip-rule="evenodd" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Temperatur</h1>
+                    </div>
+                    <p id="live-temp-detail" class="text-4xl font-bold text-gray-900 mb-2">36.7 <span class="text-2xl font-medium text-gray-500">°C</span></p>
+                    <p class="text-sm text-gray-500 mb-6">Körpertemperatur im Normalbereich.</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Temperatur-Diagramm</p></div>
+                </div>
+            </main>
+
+            <!-- Schritte Detailseite -->
+            <main id="steps-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-green-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-green-600"><path fill-rule="evenodd" d="M10.75 3.065A1.75 1.75 0 0 0 9 4.815V6.5a.75.75 0 0 1-1.5 0V4.815a3.25 3.25 0 0 1 5.46-2.012l.144.288a.75.75 0 0 1-1.354.676l-.144-.288a1.75 1.75 0 0 0-1.752-.428ZM8.11 8.11a.75.75 0 0 1 .638-.804A1.75 1.75 0 0 1 10.5 9v.25a.75.75 0 0 1-1.5 0V9a.25.25 0 0 0-.25-.25.75.75 0 0 1-.64-.84Zm-2.3 1.67a.75.75 0 0 1 1.023-.927 1.75 1.75 0 0 1 2.004-.543.75.75 0 0 1 .804.638 3.25 3.25 0 0 1-3.46 3.012l-.144-.288a.75.75 0 0 1 1.354-.676l.144.288a1.75 1.75 0 0 0 1.752.428.75.75 0 0 1 .64.84 3.25 3.25 0 0 1-5.46 2.012l-.144-.288a.75.75 0 1 1 1.354-.676l.144.288a1.75 1.75 0 0 0 2.004-.543.75.75 0 0 1 1.023-.927Z" clip-rule="evenodd" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Schritte</h1>
+                    </div>
+                    <p id="live-steps-detail" class="text-4xl font-bold text-gray-900 mb-2">8.432</p>
+                    <p id="live-steps-detail-goal" class="text-sm text-gray-500 mb-6">Tagesziel: 10.000 (84% erreicht)</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Schritte-Diagramm</p></div>
+                </div>
+            </main>
+            
+            <!-- Kalorien Detailseite -->
+            <main id="calories-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-orange-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-orange-600"><path fill-rule="evenodd" d="M11.78 2.22a.75.75 0 0 1 .22.53v1.365a.75.75 0 0 1-.416.675C10.932 5.11 9.61 5.5 8.5 5.5c-1.076 0-2.131-.36-2.93-.873a.75.75 0 0 1-.416-.675V2.75a.75.75 0 0 1 .75-.75c.19 0 .37.07.51.19l.01.01c.784.63 1.8.95 2.83.95s2.046-.32 2.83-.95l.01-.01a.75.75 0 0 1 .73-.72Zm-3.03 1.155a3.25 3.25 0 0 1 1.75 0C11.134 3.653 11.75 4.51 11.75 5.5c0 .99-.616 1.847-1.5 2.122V9.25a.75.75 0 0 1-1.5 0V7.622C7.866 7.347 7.25 6.49 7.25 5.5c0-.99.616-1.847 1.5-2.122Z" clip-rule="evenodd" /><path d="M10 18a.75.75 0 0 0 .75-.75V9.673a.75.75 0 0 0-.323-.629A3.001 3.001 0 0 1 10 9c-.394 0-.77.071-1.112.203a.75.75 0 0 0-.323.629V17.25A.75.75 0 0 0 10 18Z" /><path d="M10 18c-3.05 0-5.738-1.5-7.25-3.845a.75.75 0 0 1 .637-1.08C4.13 13.02 5.412 13 6.9 13c1.61 0 3.014.025 3.999-.08a.75.75 0 0 1 .8.653C11.91 16.32 11.235 18 10 18Z" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Kalorien</h1>
+                    </div>
+                    <p id="live-calories-detail" class="text-4xl font-bold text-gray-900 mb-2">2145 <span class="text-2xl font-medium text-gray-500">kcal</span></p>
+                    <p class="text-sm text-gray-500 mb-6">Aktiv verbrannt. Gesamtziel: 2500 kcal.</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Kalorien-Diagramm</p></div>
+                </div>
+            </main>
+            
+            <!-- Aktiv Detailseite -->
+            <main id="active-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-sky-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-sky-600"><path fill-rule="evenodd" d="M10 1.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 1.5ZM5.503 4.24a.75.75 0 0 1 .958-.415l1.41 1.059a.75.75 0 0 1-.543 1.373l-1.41-1.059a.75.75 0 0 1-.415-.958ZM14.497 4.24a.75.75 0 0 1 .415.958l-1.41 1.059a.75.75 0 1 1-.543-1.373l1.41-1.059a.75.75 0 0 1 .128-.085Zm-1.18 5.46a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM4.25 10a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM10 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /><path d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM10 15c-4.414 0-8.108-2.68-8.918-6.195a.75.75 0 0 1 1.48-.31C3.308 11.63 6.368 13.5 10 13.5s6.692-1.87 7.438-5.006a.75.75 0 0 1 1.48.31C18.108 12.32 14.414 15 10 15Z" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Aktive Minuten</h1>
+                    </div>
+                    <p id="live-active-detail" class="text-4xl font-bold text-gray-900 mb-2">67 <span class="text-2xl font-medium text-gray-500">Minuten</span></p>
+                    <p class="text-sm text-gray-500 mb-6">Tagesziel: 60 Minuten (112% erreicht).</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Aktivitäts-Diagramm</p></div>
+                </div>
+            </main>
+            
+            <!-- Distanz Detailseite -->
+            <main id="distance-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-purple-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6 text-purple-600"><path fill-rule="evenodd" d="m9.677 2.012 5.5 1.618a.75.75 0 0 1 .58.736v9.268a.75.75 0 0 1-1.196.634l-4.756-2.854a.75.75 0 0 0-.612 0l-4.756 2.854a.75.75 0 0 1-1.196-.634V4.366a.75.75 0 0 1 .58-.736l5.5-1.618a.75.75 0 0 1 .612 0Z" clip-rule="evenodd" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Distanz</h1>
+                    </div>
+                    <p id="live-distance-detail" class="text-4xl font-bold text-gray-900 mb-2">6.2 <span class="text-2xl font-medium text-gray-500">Kilometer</span></p>
+                    <p class="text-sm text-gray-500 mb-6">Tagesziel: 5 km (124% erreicht).</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Distanz-Diagramm</p></div>
+                </div>
+            </main>
+            
+            <!-- Schlaf Detailseite -->
+            <main id="sleep-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="bg-indigo-100 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg></div>
+                        <h1 class="text-2xl font-bold text-gray-900">Schlafanalyse</h1>
+                    </div>
+                    <p id="live-sleep-detail" class="text-4xl font-bold text-gray-900 mb-2">7.5 <span class="text-2xl font-medium text-gray-500">Stunden</span></p>
+                    <p id="live-sleep-detail-quality" class="text-sm text-gray-500 mb-6">Schlafqualität: 82%.</p>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center"><p class="text-gray-500">Platzhalter für detailliertes Schlaf-Diagramm</p></div>
+                </div>
+            </main>
+
+            <!-- Score-Details-Ansicht -->
+            <main id="score-detail-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <h1 id="live-score-detail" class="text-2xl font-bold text-gray-900 mb-2">Ihr Gesundheitsccore (Heute): 87/100</h1>
+                    <p class="text-lg text-gray-600 mb-6">Ihr heutiger Score basiert auf den Daten der letzten 24 Stunden.</p>
+                    <!-- Dynamischer Inhalt für Score-Details (Beispiel) -->
+                    <div id="score-detail-breakdown" class="space-y-4">
+                        <div><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-700">Herz-Kreislauf</span><span class="text-sm font-semibold text-fuchsia-600">90 / 100</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-fuchsia-500 h-2 rounded-full" style="width: 90%"></div></div></div>
+                        <div><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-700">Aktivität</span><span class="text-sm font-semibold text-green-600">85 / 100</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div></div></div>
+                        <div><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-700">Schlaf</span><span class="text-sm font-semibold text-indigo-600">82 / 100</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-indigo-500 h-2 rounded-full" style="width: 82%"></div></div></div>
+                        <div><div class="flex justify-between items-center mb-1"><span class="text-sm font-medium text-gray-700">Stress-Balance</span><span class="text-sm font-semibold text-yellow-600">65 / 100</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-yellow-500 h-2 rounded-full" style="width: 65%"></div></div></div>
+                    </div>
+                </div> 
+            </main>
+
+            <!-- Einstellungen-Ansicht (jetzt korrekt getrennt) -->
+            <main id="settings-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <div class="flex items-center space-x-3 mb-4">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 text-gray-700"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-1.007 1.11-1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c.09.542.56 1.007 1.11 1.227l-.11.02-.01-.004.01-.004.01-.004c.55-.22 1.15-.22 1.7 0l.01.004.01.004-.01.004-.11-.02c.55.22 1.02.685 1.11 1.227l.07.41-.07-.41c-.09.542-.56 1.007-1.11 1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41c-.09-.542-.56-1.007-1.11-1.227l.11-.02.01.004-.01.004-.01.004c-.55.22-1.15.22-1.7 0l-.01-.004-.01-.004.01-.004.11.02c-.55-.22-1.02-.685-1.11-1.227l-.07-.41.07.41zM10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0z" /></svg>
+                        <h1 class="text-2xl font-bold text-gray-900">Einstellungen</h1>
+                    </div>
+                    <p class="text-gray-600 mb-6">Verwalten Sie hier Ihre Profil-, Benachrichtigungs- und Dateneinstellungen.</p>
+                    <div class="space-y-4">
+                        <button id="profile-settings-button" class="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200 w-full clickable-card"><span class="font-medium">Profil bearbeiten</span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
+                        <button id="notifications-settings-button" class="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200 w-full clickable-card"><span class="font-medium">Benachrichtigungen</span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
+                        <button id="privacy-settings-button" class="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200 w-full clickable-card"><span class="font-medium">Datenschutz & Sicherheit</span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-gray-500"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
+                        <!-- NEUER DEMO-BUTTON -->
+                        <button id="demo-mode-button" class="flex justify-between items-center p-4 bg-orange-50 rounded-lg border border-orange-200 w-full clickable-card">
+                            <span class="font-medium text-orange-700">Demo-Modus (Simulator)</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-orange-600"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 12.175A3.375 3.375 0 0 1 18 9.75V8.25A3.375 3.375 0 0 0 14.625 4.875c-1.72 0-3.223 1.149-3.687 2.793a3.375 3.375 0 0 0-1.875 0c-.464-1.644-1.967-2.793-3.687-2.793A3.375 3.375 0 0 0 2.25 8.25v1.5c0 1.282.69 2.435 1.763 3.018M15.75 12.75 18 15V8.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75 2.25 15V8.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75m-3 0a3 3 0 0 1 3-3V12.75a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3v-3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75m-3 0a3 3 0 0 0-3-3V12.75a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3v-3Z" /></svg>
+                        </button>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Bericht-Ansicht -->
+            <main id="report-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Gesundheitsbericht</h1>
+                    <p class="text-gray-600 mb-6">Generieren Sie hier Ihre wöchentlichen oder monatlichen Berichte.</p>
+                    
+                    <!-- Gemini Wochen-Zusammenfassung -->
+                    <div class="mt-6 border-t border-gray-200 pt-6 space-y-4">
+                        <h2 class="text-lg font-semibold text-gray-800">KI-Wochenübersicht</h2>
+
+                        <!-- Lade-Spinner für Zusammenfassung -->
+                        <div id="summary-loader" class="hidden flex items-center justify-center py-4">
+                            <div class="loader"></div>
+                            <p class="ml-3 text-gray-500">Zusammenfassung wird generiert...</p>
+                        </div>
+
+                        <!-- Button zum Generieren -->
+                        <div id="summary-button-container" class="flex">
+                            <button id="generate-summary-button" class="flex items-center space-x-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 clickable-card">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                  <path fill-rule="evenodd" d="M10 1.5a.75.75 0 0 1 .75.75V3a.75.75 0 0 1-1.5 0V1.5A.75.75 0 0 1 10 1.5Zm0 13.5a.75.75 0 0 1 .75.75V17a.75.75 0 0 1-1.5 0v-1.25a.75.75 0 0 1 .75-.75Zm7.06-6.06a.75.75 0 0 1 0 1.06l-.884.884a.75.75 0 1 1-1.06-1.06l.884-.884a.75.75 0 0 1 1.06 0ZM3.828 4.89a.75.75 0 0 1 1.06 0l.884.884a.75.75 0 1 1-1.06 1.06L3.828 5.95A.75.75 0 0 1 3.828 4.89Zm12.344 1.06a.75.75 0 0 1 1.06 0l.884.884a.75.75 0 1 1-1.06 1.06l-.884-.884a.75.75 0 0 1 0-1.06ZM4.89 15.107a.75.75 0 0 1 0-1.06l.884-.884a.75.75 0 1 1 1.06 1.06l-.884.884a.75.75 0 0 1-1.06 0Zm11.314-1.06a.75.75 0 0 1 0 1.06l-.884.884a.75.75 0 1 1-1.06-1.06l.884-.884a.75.75 0 0 1 1.06 0ZM3.828 10.75a.75.75 0 0 1 .75-.75h1.25a.75.75 0 0 1 0 1.5H4.578a.75.75 0 0 1-.75-.75Zm11.364 0a.75.75 0 0 1 .75-.75h1.25a.75.75 0 0 1 0 1.5h-1.25a.75.75 0 0 1-.75-.75Zm-4.242 3.53a.75.75 0 0 1 1.06 0l.884.884a.75.75 0 1 1-1.06 1.06l-.884-.884a.75.75 0 0 1 0-1.06Zm-1.06-1.06a.75.75 0 0 1 0-1.06L10.75 9.3l-.884-.884a.75.75 0 1 1 1.06-1.06l.884.884a.75.75 0 0 1 0 1.06L10 13.25a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" />
+                                </svg>
+                                <span>✨ Woche zusammenfassen</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Hier wird die generierte Zusammenfassung angezeigt -->
+                        <div id="summary-result" class="hidden p-4 bg-blue-50 text-blue-800 rounded-lg border border-blue-200">
+                        </div>
+                    </div>
+
+                    <h2 class="text-lg font-semibold text-gray-800 mt-6">Wöchentliche Aktivität (Platzhalter)</h2>
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p>Hier könnte ein detailliertes Diagramm zur Wochenaktivität stehen.</p>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Profil-Einstellungen Detailseite -->
+            <main id="profile-settings-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button-settings flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück zu Einstellungen</span></button>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Profil bearbeiten</h1>
+                    <p class="text-gray-600">Hier könnten Formularfelder für Name, Alter, Größe, Gewicht etc. sein.</p>
+                </div>
+            </main>
+            
+            <!-- Benachrichtigungen Detailseite -->
+            <main id="notifications-settings-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button-settings flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück zu Einstellungen</span></button>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Benachrichtigungen</h1>
+                    <p class="text-gray-600">Hier könnten Toggles zum Ein- und Ausschalten von Benachrichtigungen sein.</p>
+                </div>
+            </main>
+            
+            <!-- Datenschutz Detailseite -->
+            <main id="privacy-settings-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button-settings flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück zu Einstellungen</span></button>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Datenschutz & Sicherheit</h1>
+                    <p class="text-gray-600">Hier könnten Optionen zum Datenexport oder Löschen des Kontos sein.</p>
+                </div>
+            </main>
+
+            <!-- #################################### -->
+            <!-- #####  NEU: DEMO-MODUS-SEITE  ###### -->
+            <!-- #################################### -->
+            <main id="demo-mode-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button-settings flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                        <span>Zurück zu Einstellungen</span>
+                    </button>
+                    <div class="flex items-center space-x-3 mb-4">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8 text-orange-600"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 12.175A3.375 3.375 0 0 1 18 9.75V8.25A3.375 3.375 0 0 0 14.625 4.875c-1.72 0-3.223 1.149-3.687 2.793a3.375 3.375 0 0 0-1.875 0c-.464-1.644-1.967-2.793-3.687-2.793A3.375 3.375 0 0 0 2.25 8.25v1.5c0 1.282.69 2.435 1.763 3.018M15.75 12.75 18 15V8.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75 2.25 15V8.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75m-3 0a3 3 0 0 1 3-3V12.75a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3v-3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75m-3 0a3 3 0 0 0-3-3V12.75a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3v-3Z" /></svg>
+                        <h1 class="text-2xl font-bold text-gray-900">Demo-Daten Simulator</h1>
+                    </div>
+                    <p class="text-gray-600 mb-6">Ändere hier die Live-Daten. Score & Analyse-Text werden beim Speichern automatisch simuliert.</p>
+                    
+                    <div class="space-y-4 max-w-lg mx-auto">
+                        <!-- Analyse-Text-Feld ENTFERNT -->
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="demo-stress" class="block text-sm font-medium text-gray-700">Stress (z.B. 35)</label>
+                                <input type="number" id="demo-stress" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="demo-hr" class="block text-sm font-medium text-gray-700">Ruhepuls (z.B. 68)</label>
+                                <input type="number" id="demo-hr" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="demo-steps" class="block text-sm font-medium text-gray-700">Schritte (z.B. 8432)</label>
+                                <input type="number" id="demo-steps" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="demo-sleep" class="block text-sm font-medium text-gray-700">Schlaf (z.B. 7.5)</label>
+                                <input type="number" step="0.1" id="demo-sleep" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        
+                        <!-- NEUE FELDER FÜR MEHR KONTROLLE -->
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="demo-bp" class="block text-sm font-medium text-gray-700">Blutdruck (z.B. 118/78)</label>
+                                <input type="text" id="demo-bp" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="demo-spo2" class="block text-sm font-medium text-gray-700">SpO2 (z.B. 98)</label>
+                                <input type="number" id="demo-spo2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="demo-temp" class="block text-sm font-medium text-gray-700">Temperatur (z.B. 36.7)</label>
+                                <input type="number" step="0.1" id="demo-temp" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="demo-calories" class="block text-sm font-medium text-gray-700">Kalorien (z.B. 2145)</label>
+                                <input type="number" id="demo-calories" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="demo-active" class="block text-sm font-medium text-gray-700">Aktiv (z.B. 67)</label>
+                                <input type="number" id="demo-active" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="demo-distance" class="block text-sm font-medium text-gray-700">Distanz (z.B. 6.2)</label>
+                                <input type="number" step="0.1" id="demo-distance" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            </div>
+                        </div>
+
+                        <div class="pt-4">
+                            <button id="demo-save-button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 clickable-card">
+                                Speichern & Simulieren
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+
+            <!-- #################################### -->
+            <!-- #####  NEUE PLATZHALTER-SEITEN  ###### -->
+            <!-- #################################### -->
+
+            <!-- Teilen-Ansicht -->
+            <main id="share-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Teilen</h1>
+                    <p class="text-gray-600 mb-6">Hier könnten Sie Optionen finden, um Ihren Bericht mit Ihrem Arzt oder Ihrer Familie zu teilen.</p>
+                </div>
+            </main>
+
+            <!-- Smartwatch-Ansicht -->
+            <main id="watch-view" class="app-view max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full view-hidden">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <button class="back-button flex items-center space-x-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer mb-4"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg><span>Zurück</span></button>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-4">Smartwatch verbunden</h1>
+                    <p class="text-gray-600 mb-6">Status: Verbunden (Demo-Watch). Hier könnten Optionen zum Synchronisieren oder Trennen der Verbindung sein.</p>
+                </div>
+            </main>
+
+        </div> <!-- Ende Haupt-Container -->
+    </div>
+
+    <script>
+        // API-Schlüssel (leer lassen, wird von der Umgebung bereitgestellt)
+        const apiKey = "";
+
+        // --- NEU: HINZUGEFÜGTE GEMINI API FUNKTIONEN ---
+
+        /**
+         * Ruft die Gemini Text-API mit Exponential Backoff auf.
+         */
+        async function callGeminiAPI(userPrompt, systemPrompt) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            try {
+                const response = await fetchWithBackoff(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed with status ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates[0].content?.parts?.[0]?.text) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    return "Entschuldigung, es gab ein Problem beim Generieren der Antwort.";
+                }
+            } catch (error) {
+                console.error("Fehler beim Aufruf der Gemini API:", error);
+                return "Fehler: Die KI-Empfehlungen konnten nicht geladen werden.";
+            }
+        }
+
+        // --- TTS HILFSFUNKTIONEN ---
+        
+        /**
+         * Konvertiert einen Base64-String in einen ArrayBuffer.
+         */
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Schreibt einen String in einen DataView.
+         */
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        /**
+         * Konvertiert rohe PCM-Audiodaten in ein abspielbares WAV-Blob.
+         */
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            const dataSize = pcmData.length * pcmData.BYTES_PER_ELEMENT;
+            
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            /* RIFF header */
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            /* 'fmt ' sub-chunk */
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            /* 'data' sub-chunk */
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // PCM data
+            new Int16Array(buffer, 44).set(pcmData);
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        /**
+         * Ruft die Gemini TTS API auf und spielt die Audio ab.
+         */
+        async function callGeminiTTSAPI(textToSpeak) {
+            const ttsButton = document.getElementById('play-tts-button');
+            const ttsButtonText = document.getElementById('play-tts-button-text');
+            
+            if (ttsLoading) return;
+            ttsLoading = true;
+            if (ttsButtonText) ttsButtonText.textContent = "Wird geladen...";
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{ text: `Sage auf Deutsch mit freundlicher, klarer Stimme: ${textToSpeak}` }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } // 'Kore' ist eine klare Stimme
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const response = await fetchWithBackoff(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`TTS API call failed with status ${response.status}`);
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000; // Standard 24kHz
+
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    if (!audioContext) {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onplay = () => {
+                        if (ttsButtonText) ttsButtonText.textContent = "Spielt...";
+                    };
+                    audio.onended = () => {
+                        if (ttsButtonText) ttsButtonText.textContent = "Anhören";
+                        ttsLoading = false;
+                    };
+
+                } else {
+                    throw new Error("Invalid TTS response format");
+                }
+
+            } catch (error) {
+                console.error("Fehler beim Aufruf der Gemini TTS API:", error);
+                if (ttsButtonText) ttsButtonText.textContent = "Fehler";
+                setTimeout(() => {
+                    if (ttsButtonText) ttsButtonText.textContent = "Anhören";
+                }, 3000);
+                ttsLoading = false;
+            }
+        }
+
+        // --- ENDE DER NEUEN FUNKTIONEN ---
+
+
+        // --- NEU: Globales Datenobjekt ---
+        // Alle Live-Daten der App werden hier gespeichert.
+        // Dies ermöglicht den Demo-Modus.
+        let healthData = {
+            score: 87,
+            scoreChange: "+5%",
+            hr: 68,
+            hrMin: 58,
+            hrMax: 145,
+            bp: "118/78",
+            spo2: 98,
+            temp: 36.7,
+            steps: 8432,
+            stepsGoal: 10000,
+            calories: 2145,
+            active: 67,
+            distance: 6.2,
+            sleepHours: 7.5,
+            sleepQuality: 82,
+            sleepDeep: 2.5,
+            sleepRem: 1.6,
+            sleepLight: 3.2,
+            stress: 35,
+            // Der wichtigste Text für die KI-Demo
+            analysisText: "Status: Geringes Risiko. Leichte Abweichungen im Herz-Kreislauf-Muster erkannt.",
+            analysisStatus: "low", // 'low', 'medium', 'high'
+            // Daten für die Diagramme
+            radar: [
+                { axis: "Herz-Kreislauf", value: 0.7 },
+                { axis: "Atmung", value: 0.8 },
+                { axis: "Schlaf", value: 0.9 },
+                { axis: "Aktivität", value: 0.6 },
+                { axis: "Stress", value: 0.4 }
+            ],
+            hrv: [
+                { time: "00:00", value: 60 },{ time: "02:00", value: 58 },{ time: "04:00", value: 55 },{ time: "06:00", value: 57 },{ time: "08:00", value: 65 },{ time: "10:00", value: 70 },{ time: "12:00", value: 68 },{ time: "14:00", value: 66 },{ time: "16:00", value: 64 },{ time: "18:00", value: 68 },{ time: "20:00", value: 70 },{ time: "22:00", value: 65 }
+            ]
+        };
+
+        // Globale Variablen für den App-Zustand
+        const views = document.querySelectorAll('.app-view');
+        let currentView = 'dashboard-view';
+        let lastGeneratedRecommendation = ""; // Speichert den Text für TTS
+        let audioContext = null; // AudioContext für TTS-Wiedergabe
+        let ttsLoading = false; // Verhindert doppelte TTS-Aufrufe
+
+        // --- Exponential Backoff für API-Aufrufe ---
+        async function fetchWithBackoff(apiUrl, options, maxRetries = 5) {
+            let delay = 1000; // 1 Sekunde
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, options);
+                    if (response.status === 429 || response.status >= 500) {
+                        // Throttling oder Server-Fehler -> Retry
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                    return response; // Erfolgreiche Antwort
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error; // Letzter Versuch fehlgeschlagen
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // Nächste Verzögerung verdoppeln
+                }
+            }
+        }
+        
+        // --- NEU: SIMULATIONS-ALGORITHMUS ---
+        /**
+         * Simuliert die Kernlogik (den USP) der App.
+         * Liest die Rohdaten aus healthData und generiert
+         * einen neuen Score und einen neuen Analyse-Text.
+         */
+        function simulateAlgorithm() {
+            let newScore = 50; // Basis-Score
+            let newAnalysisText = "";
+            let newStatus = "low";
+            
+            const { hr, stress, steps, sleepHours, spo2, bp } = healthData;
+            
+            // 1. Stress-Logik (hohe Priorität)
+            if (stress > 80) {
+                newScore -= 30;
+                newAnalysisText = "Status: Hohes Risiko. Extrem hohes Stresslevel (über 80) erkannt. Dies beeinträchtigt Ihre Erholung signifikant. Bitte suchen Sie Ruhephasen.";
+                newStatus = "high";
+            } else if (stress > 60) {
+                newScore -= 15;
+                newAnalysisText = "Status: Mittleres Risiko. Erhöhtes Stresslevel (über 60) festgestellt. Achten Sie auf Entspannung und ausreichend Schlaf.";
+                newStatus = "medium";
+            } else {
+                newScore += 10; // Bonus für niedrigen Stress
+            }
+            
+            // 2. Schlaf-Logik
+            if (sleepHours < 6) {
+                newScore -= 15;
+                if (!newAnalysisText) newAnalysisText = "Status: Mittleres Risiko. Schlafmangel (unter 6 Std.) festgestellt. Dies reduziert Ihre Regenerationsfähigkeit.";
+                if (newStatus === 'low') newStatus = "medium";
+            } else if (sleepHours > 7) {
+                newScore += 15; // Bonus für guten Schlaf
+            }
+            
+            // 3. Aktivitäts-Logik
+            if (steps > 10000) {
+                newScore += 20; // Bonus
+            } else if (steps < 3000) {
+                newScore -= 10;
+                if (!newAnalysisText) newAnalysisText = "Status: Geringes Risiko. Geringe tägliche Aktivität (unter 3.000 Schritte) registriert. Versuchen Sie, mehr Bewegung zu integrieren.";
+            }
+            
+            // 4. Herz-Logik (Ruhepuls)
+            if (hr > 85) { // Hoher Ruhepuls
+                newScore -= 20;
+                newAnalysisText = `Status: Mittleres Risiko. Ein erhöhter Ruhepuls von ${hr} BPM wurde festgestellt. Dies kann auf Stress oder mangelnde Fitness hindeuten.`;
+                newStatus = "medium";
+            } else if (hr < 50) { // Niedriger Puls (kann gut oder schlecht sein)
+                newScore += 5; // Oft ein Zeichen für Fitness
+            }
+
+            // 5. SpO2-Logik
+            if (spo2 < 92) {
+                newScore -= 30;
+                newAnalysisText = `Status: Hohes Risiko. Niedrige Blutsauerstoffsättigung (${spo2}%) erkannt. Dies erfordert Aufmerksamkeit. Prüfen Sie die Messung erneut.`;
+                newStatus = "high";
+            }
+            
+            // Standard-Text, wenn nichts anderes zutrifft
+            if (!newAnalysisText) {
+                newAnalysisText = "Status: Geringes Risiko. Alle Vitalwerte sind im optimalen Bereich. Großartige Arbeit!";
+                newStatus = "low";
+            }
+            
+            // Score begrenzen (0-100)
+            healthData.score = Math.max(0, Math.min(100, newScore));
+            healthData.analysisText = newAnalysisText;
+            healthData.analysisStatus = newStatus;
+            
+            // Auch die Radar-Chart-Daten anpassen (vereinfacht)
+            healthData.radar[0].value = Math.max(0.1, (100 - (hr > 70 ? (hr - 70) * 2 : 0)) / 100); // Herz
+            healthData.radar[2].value = Math.max(0.1, sleepHours / 8.0); // Schlaf
+            healthData.radar[3].value = Math.max(0.1, steps / 10000.0); // Aktivität
+            healthData.radar[4].value = Math.max(0.1, (100 - stress) / 100); // Stress
+        }
+
+
+        // --- NEU: Render-Funktion ---
+        // Aktualisiert die gesamte Benutzeroberfläche basierend auf dem healthData-Objekt
+        function renderHealthData() {
+            try {
+                // Dashboard-Werte
+                document.getElementById('analysis-text-content').textContent = healthData.analysisText;
+                // Kachel-Farbe anpassen
+                const analysisButton = document.getElementById('predictive-analysis-button');
+                analysisButton.classList.remove('status-low', 'status-medium', 'status-high');
+                analysisButton.classList.add(`status-${healthData.analysisStatus}`);
+
+                document.getElementById('live-score').textContent = healthData.score;
+                document.getElementById('live-score-change').textContent = healthData.scoreChange + " diese Woche"; // (Bleibt statisch für Demo)
+                document.getElementById('live-hr-kachel').textContent = healthData.hr;
+                document.getElementById('live-hr-kachel-minmax').textContent = `Min: ${healthData.hrMin} • Max: ${healthData.hrMax}`; // (Min/Max bleiben statisch)
+                document.getElementById('live-bp-kachel').textContent = healthData.bp;
+                document.getElementById('live-spo2-kachel').textContent = healthData.spo2;
+                document.getElementById('live-temp-kachel').textContent = healthData.temp;
+                
+                document.getElementById('live-steps-kachel').textContent = healthData.steps.toLocaleString('de-DE');
+                document.getElementById('live-steps-goal').textContent = `von ${healthData.stepsGoal.toLocaleString('de-DE')} Ziel`;
+                document.getElementById('live-calories-kachel').textContent = healthData.calories.toLocaleString('de-DE');
+                document.getElementById('live-active-kachel').textContent = healthData.active;
+                document.getElementById('live-distance-kachel').textContent = healthData.distance;
+
+                document.getElementById('live-sleep-hours').textContent = healthData.sleepHours;
+                document.getElementById('live-sleep-quality').textContent = healthData.sleepQuality + "%"; // (Bleibt statisch)
+                document.getElementById('live-sleep-quality-bar').style.width = healthData.sleepQuality + "%";
+                
+                const totalSleep = healthData.sleepDeep + healthData.sleepRem + healthData.sleepLight;
+                if (totalSleep > 0) {
+                    document.getElementById('live-sleep-deep-bar').style.width = (healthData.sleepDeep / totalSleep) * 100 + "%";
+                    document.getElementById('live-sleep-rem-bar').style.width = (healthData.sleepRem / totalSleep) * 100 + "%";
+                    document.getElementById('live-sleep-light-bar').style.width = (healthData.sleepLight / totalSleep) * 100 + "%";
+                }
+                document.getElementById('live-sleep-deep-text').textContent = healthData.sleepDeep + "h";
+                document.getElementById('live-sleep-rem-text').textContent = healthData.sleepRem + "h";
+                document.getElementById('live-sleep-light-text').textContent = healthData.sleepLight + "h";
+
+                // Stress-Label
+                document.getElementById('live-stress-level').textContent = healthData.stress;
+                document.getElementById('live-stress-bar').style.width = healthData.stress + "%";
+                const stressLabel = document.getElementById('live-stress-label');
+                const stressBar = document.getElementById('live-stress-bar');
+                if (healthData.stress > 70) {
+                    stressLabel.textContent = "Hoch";
+                    stressLabel.className = "text-xs font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full";
+                    stressBar.className = "bg-red-500 h-1.5 rounded-full";
+                } else if (healthData.stress > 40) {
+                    stressLabel.textContent = "Mittel";
+                    stressLabel.className = "text-xs font-semibold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full";
+                    stressBar.className = "bg-yellow-500 h-1.5 rounded-full";
+                } else {
+                    stressLabel.textContent = "Niedrig";
+                    stressLabel.className = "text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full";
+                    stressBar.className = "bg-green-500 h-1.5 rounded-full";
+                }
+
+                // Detail-Seiten-Werte (füllen)
+                document.getElementById('live-hr-detail').textContent = healthData.hr;
+                document.getElementById('live-hr-detail-minmax').textContent = `Ihr aktueller Ruhepuls. Min: ${healthData.hrMin}, Max: ${healthData.hrMax} (heute).`;
+                document.getElementById('live-bp-detail').textContent = `${healthData.bp} mmHg`;
+                document.getElementById('live-spo2-detail').textContent = `${healthData.spo2} %`;
+                document.getElementById('live-temp-detail').textContent = `${healthData.temp} °C`;
+                document.getElementById('live-steps-detail').textContent = healthData.steps.toLocaleString('de-DE');
+                document.getElementById('live-steps-detail-goal').textContent = `Tagesziel: ${healthData.stepsGoal.toLocaleString('de-DE')} (${Math.round((healthData.steps / healthData.stepsGoal) * 100)}% erreicht)`;
+                document.getElementById('live-calories-detail').textContent = `${healthData.calories.toLocaleString('de-DE')} kcal`;
+                document.getElementById('live-active-detail').textContent = `${healthData.active} Minuten`;
+                document.getElementById('live-sleep-detail').textContent = `${healthData.sleepHours} Stunden`;
+                document.getElementById('live-sleep-detail-quality').textContent = `Schlafqualität: ${healthData.sleepQuality}%`;
+                
+                // Analyse-Detailseite
+                document.getElementById('live-score-detail').textContent = `Ihr Gesundheitsccore (Heute): ${healthData.score}/100`;
+                const statusBox = document.getElementById('analysis-status-box');
+                const statusTitle = document.getElementById('analysis-status-title');
+                document.getElementById('analysis-text-content-detail').textContent = healthData.analysisText;
+                
+                statusBox.className = "p-4 rounded-lg mb-6"; // Reset
+                if (healthData.analysisStatus === 'high') {
+                    statusBox.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-800');
+                    statusTitle.textContent = "Status: Hohes Risiko";
+                } else if (healthData.analysisStatus === 'medium') {
+                    statusBox.classList.add('bg-yellow-50', 'border', 'border-yellow-200', 'text-yellow-800');
+                    statusTitle.textContent = "Status: Mittleres Risiko";
+                } else {
+                    statusBox.classList.add('bg-green-50', 'border', 'border-green-200', 'text-green-800');
+                    statusTitle.textContent = "Status: Geringes Risiko";
+                }
+                
+                // (Die Detail-Erklärungen bleiben für die Demo statisch, nur der Haupttext ändert sich)
+
+
+                // Diagramme neu zeichnen
+                drawRadarChart(healthData.radar);
+                drawHrvChart(healthData.hrv); // HRV-Daten bleiben für die Demo statisch
+
+            } catch (e) {
+                // console.error("Fehler beim Rendern der Daten:", e);
+                // Dies ist ok, wenn eine Ansicht (z.B. Detailseite) nicht sichtbar ist.
+            }
+        }
+
+
+        // --- Navigationslogik ---
+        function showView(viewId) {
+            if (viewId === currentView) return; 
+
+            const viewToHide = document.getElementById(currentView);
+            const viewToShow = document.getElementById(viewId);
+
+            if (viewToHide) {
+                viewToHide.classList.remove('view-visible');
+                viewToHide.classList.add('view-hidden');
+                setTimeout(() => {
+                    viewToHide.style.display = 'none';
+                }, 200); 
+            }
+
+            if (viewToShow) {
+                viewToShow.style.display = 'block';
+                setTimeout(() => {
+                    viewToShow.classList.remove('view-hidden');
+                    viewToShow.classList.add('view-visible');
+                }, 10); 
+                
+                window.scrollTo(0, 0); 
+                
+                if (viewId === 'dashboard-view') {
+                    setTimeout(() => {
+                        renderHealthData(); // Neu rendern, falls Daten sich geändert haben
+                    }, 210); 
+                }
+            }
+            
+            currentView = viewId;
+        }
+
+        // Führe Skripte aus, wenn das DOM geladen ist
+        document.addEventListener('DOMContentLoaded', function () {
+            // Initial-Render mit Daten
+            renderHealthData();
+            
+            window.addEventListener('resize', () => {
+                setTimeout(() => {
+                    if (currentView === 'dashboard-view') {
+                        renderHealthData();
+                    }
+                }, 200);
+            });
+
+            // Navigations-Buttons (mit optional chaining '?' versehen)
+            document.getElementById('logo-button')?.addEventListener('click', () => showView('dashboard-view'));
+            document.getElementById('report-button')?.addEventListener('click', () => showView('report-view'));
+            document.getElementById('share-button')?.addEventListener('click', () => showView('share-view'));
+            document.getElementById('watch-button')?.addEventListener('click', () => showView('watch-view'));
+            document.getElementById('settings-button')?.addEventListener('click', () => showView('settings-view'));
+            
+            // *** DER NEUE USP-BUTTON ***
+            document.getElementById('predictive-analysis-button')?.addEventListener('click', () => showView('predictive-analysis-view'));
+            
+            // Detail-Buttons (Dashboard)
+            document.getElementById('score-details-button')?.addEventListener('click', () => showView('score-detail-view'));
+            
+            // Kachel-Buttons (Dashboard)
+            document.getElementById('hr-card-button')?.addEventListener('click', () => showView('hr-detail-view'));
+            document.getElementById('bp-card-button')?.addEventListener('click', () => showView('bp-detail-view'));
+            document.getElementById('spo2-card-button')?.addEventListener('click', () => showView('spo2-detail-view'));
+            document.getElementById('temp-card-button')?.addEventListener('click', () => showView('temp-detail-view'));
+            document.getElementById('steps-card-button')?.addEventListener('click', () => showView('steps-detail-view'));
+            document.getElementById('calories-card-button')?.addEventListener('click', () => showView('calories-detail-view'));
+            document.getElementById('active-card-button')?.addEventListener('click', () => showView('active-detail-view'));
+            document.getElementById('distance-card-button')?.addEventListener('click', () => showView('distance-detail-view'));
+            document.getElementById('sleep-card-button')?.addEventListener('click', () => showView('sleep-detail-view'));
+            
+            // Detail-Buttons (Einstellungen)
+            document.getElementById('profile-settings-button')?.addEventListener('click', () => showView('profile-settings-view'));
+            document.getElementById('notifications-settings-button')?.addEventListener('click', () => showView('notifications-settings-view'));
+            document.getElementById('privacy-settings-button')?.addEventListener('click', () => showView('privacy-settings-view'));
+
+            // NEUER Button für Demo-Modus
+            document.getElementById('demo-mode-button')?.addEventListener('click', () => {
+                // Formularfelder mit aktuellen Daten füllen
+                document.getElementById('demo-hr').value = healthData.hr;
+                document.getElementById('demo-steps').value = healthData.steps;
+                document.getElementById('demo-sleep').value = healthData.sleepHours;
+                document.getElementById('demo-stress').value = healthData.stress;
+                // document.getElementById('demo-score').value = healthData.score; // Score wird berechnet, nicht gesetzt
+                // document.getElementById('demo-analysis-text').value = healthData.analysisText; // Fällt weg
+                
+                // Neue Felder füllen
+                document.getElementById('demo-bp').value = healthData.bp;
+                document.getElementById('demo-spo2').value = healthData.spo2;
+                document.getElementById('demo-temp').value = healthData.temp;
+                document.getElementById('demo-calories').value = healthData.calories;
+                document.getElementById('demo-active').value = healthData.active;
+                document.getElementById('demo-distance').value = healthData.distance;
+                
+                showView('demo-mode-view');
+            });
+
+            // NEUER Speicher-Button im Demo-Modus
+            document.getElementById('demo-save-button')?.addEventListener('click', () => {
+                // Daten aus Formular lesen und in healthData speichern
+                healthData.hr = parseInt(document.getElementById('demo-hr').value) || healthData.hr;
+                healthData.steps = parseInt(document.getElementById('demo-steps').value) || healthData.steps;
+                healthData.sleepHours = parseFloat(document.getElementById('demo-sleep').value) || healthData.sleepHours;
+                healthData.stress = parseInt(document.getElementById('demo-stress').value) || healthData.stress;
+                // healthData.score = parseInt(document.getElementById('demo-score').value) || healthData.score; // Fällt weg
+                // healthData.analysisText = document.getElementById('demo-analysis-text').value || healthData.analysisText; // Fällt weg
+                
+                // Neue Felder speichern
+                healthData.bp = document.getElementById('demo-bp').value || healthData.bp;
+                healthData.spo2 = parseInt(document.getElementById('demo-spo2').value) || healthData.spo2;
+                healthData.temp = parseFloat(document.getElementById('demo-temp').value) || healthData.temp;
+                healthData.calories = parseInt(document.getElementById('demo-calories').value) || healthData.calories;
+                healthData.active = parseInt(document.getElementById('demo-active').value) || healthData.active;
+                healthData.distance = parseFloat(document.getElementById('demo-distance').value) || healthData.distance;
+
+                // *** NEU: Algorithmus simulieren ***
+                simulateAlgorithm();
+                
+                // App neu rendern
+                renderHealthData();
+                // Zurück zum Dashboard
+                showView('dashboard-view');
+            });
+
+
+            // Alle "Zurück zum Dashboard"-Buttons
+            document.querySelectorAll('.back-button').forEach(button => {
+                button.addEventListener('click', () => showView('dashboard-view'));
+            });
+            
+            // "Zurück zu Einstellungen"-Buttons
+            document.querySelectorAll('.back-button-settings').forEach(button => {
+                button.addEventListener('click', () => showView('settings-view'));
+            });
+
+            // --- Mobiles Menü Logik ---
+            const mobileMenuContainer = document.getElementById('mobile-menu-container');
+            const openMenuButton = document.getElementById('mobile-menu-open');
+            const closeMenuButton = document.getElementById('mobile-menu-close');
+            const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+
+            function openMobileMenu() {
+                mobileMenuContainer?.classList.remove('mobile-menu-hidden');
+                mobileMenuContainer?.classList.add('mobile-menu-visible');
+            }
+            
+            function closeMobileMenu() {
+                mobileMenuContainer?.classList.add('mobile-menu-hidden');
+                mobileMenuContainer?.classList.remove('mobile-menu-visible');
+            }
+
+            openMenuButton?.addEventListener('click', openMobileMenu);
+            closeMenuButton?.addEventListener('click', closeMobileMenu);
+            mobileMenuOverlay?.addEventListener('click', closeMobileMenu);
+            
+            document.querySelectorAll('.mobile-menu-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    const view = link.getAttribute('data-view');
+                    if (view) {
+                        showView(view);
+                    }
+                    closeMobileMenu();
+                });
+            });
+
+            // --- NEUE GEMINI EVENT LISTENERS ---
+
+            // 1. Listener für "Empfehlungen generieren"
+            document.getElementById('generate-recommendations-button')?.addEventListener('click', async () => {
+                const loader = document.getElementById('recommendations-loader');
+                const buttonContainer = document.getElementById('recommendations-button-container');
+                const resultContainer = document.getElementById('recommendations-result');
+                const ttsButton = document.getElementById('play-tts-button');
+
+                // Ladezustand
+                if (loader) loader.classList.remove('hidden');
+                if (buttonContainer) buttonContainer.classList.add('hidden');
+                if (resultContainer) resultContainer.innerHTML = "";
+                if (ttsButton) ttsButton.classList.add('hidden');
+                lastGeneratedRecommendation = "";
+
+                // Prompt vorbereiten (JETZT 100% DYNAMISCH)
+                const analysisText = healthData.analysisText; // Holt den *simulierten* Text
+                const systemPrompt = "Du bist ein freundlicher und medizinisch kompetenter Gesundheitsassistent. Basierend auf der Analyse des Nutzers, gib 2-3 konkrete, umsetzbare und positiv formulierte Empfehlungen in Stichpunkten. Antworte auf Deutsch.";
+                const userPrompt = `Meine Gesundheitsanalyse lautet: "${analysisText}". Bitte gib mir 2-3 Empfehlungen.`;
+                const result = await callGeminiAPI(userPrompt, systemPrompt);
+                
+                // Ladezustand beenden
+                if (loader) loader.classList.add('hidden');
+                
+                // Ergebnis formatieren und anzeigen
+                const recommendations = result.split('\n').filter(line => line.trim().length > 0);
+                let html = '<ul class="space-y-3 list-inside">';
+                recommendations.forEach(rec => {
+                    html += `<li class="flex items-start space-x-3">
+                                <div class="bg-blue-100 p-2 rounded-full mt-1 flex-shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-blue-600">
+                                        <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <p class="text-sm text-gray-700">${rec.replace(/^[*-]\s*/, '')}</p>
+                             </li>`;
+                });
+                html += '</ul>';
+                if (resultContainer) resultContainer.innerHTML = html;
+
+                // Text für TTS speichern und Button anzeigen
+                lastGeneratedRecommendation = result;
+                if (ttsButton) ttsButton.classList.remove('hidden');
+            });
+
+            // 2. Listener für "Woche zusammenfassen"
+            document.getElementById('generate-summary-button')?.addEventListener('click', async () => {
+                const loader = document.getElementById('summary-loader');
+                const buttonContainer = document.getElementById('summary-button-container');
+                const resultContainer = document.getElementById('summary-result');
+
+                // Ladezustand
+                if (loader) loader.classList.remove('hidden');
+                if (buttonContainer) buttonContainer.classList.add('hidden');
+                if (resultContainer) {
+                    resultContainer.classList.add('hidden');
+                    resultContainer.innerHTML = "";
+                }
+
+                // Prompt (nutzt jetzt auch die dynamischen Daten)
+                const mockDataPrompt = `Meine Wochendaten: Gesundheits-Score-Schnitt ${healthData.score}/100, Tägliche Schritte im Schnitt ${healthData.steps.toLocaleString('de-DE')}, Durchschnittlicher Schlaf ${healthData.sleepHours} Stunden. Bitte schreibe eine kurze (2-3 Sätze), motivierende Zusammenfassung meiner Woche. Antworte auf Deutsch.`;
+                const systemPrompt = "Du bist ein positiver und motivierender Gesundheits-Coach. Fasse die Wochendaten des Nutzers kurz und lobend zusammen.";
+
+                const result = await callGeminiAPI(mockDataPrompt, systemPrompt);
+
+                // Ladezustand beenden
+                if (loader) loader.classList.add('hidden');
+                if (resultContainer) {
+                    resultContainer.innerHTML = `<p>${result}</p>`;
+                    resultContainer.classList.remove('hidden');
+                }
+            });
+
+            // 3. Listener für TTS-Wiedergabe
+            document.getElementById('play-tts-button')?.addEventListener('click', () => {
+                if (lastGeneratedRecommendation && !ttsLoading) {
+                    callGeminiTTSAPI(lastGeneratedRecommendation);
+                }
+            });
+        });
+        /* --- D3 DIAGRAMM FUNKTIONEN (MODIFIZIERT) --- */
+        
+        function drawRadarChart(data) { // Akzeptiert jetzt Daten
+            const container = d3.select("#radar-chart");
+            container.selectAll("*").remove(); 
+            if (!data || data.length === 0) return; // Schutz
+            const parent = container.node().parentElement;
+            const width = parent.clientWidth || 256; 
+            const height = parent.clientHeight || 256;
+            const margin = { top: 30, right: 30, bottom: 30, left: 30 };
+            const radius = Math.min(width, height) / 2 - Math.max(margin.top, margin.right, margin.bottom, margin.left);
+            if (radius <= 0) return;
+            const svg = container.attr("viewBox", `0 0 ${width} ${height}`).attr("preserveAspectRatio", "xMidYMid meet").append("g").attr("transform", `translate(${width / 2}, ${height / 2})`);
+            const rScale = d3.scaleLinear().range([0, radius]).domain([0, 1]);
+            const angleSlice = Math.PI * 2 / data.length;
+            const levels = 4;
+            const levelFactor = radius / levels;
+            svg.selectAll(".grid-level").data(d3.range(1, levels + 1).reverse()).enter().append("circle").attr("r", d => d * levelFactor).style("fill", "rgba(255, 255, 255, 0.05)").style("stroke", "rgba(255, 255, 255, 0.2)").style("stroke-width", "0.5px");
+            svg.selectAll(".axis-line").data(data).enter().append("line").attr("x1", 0).attr("y1", 0).attr("x2", (d, i) => rScale(1.1) * Math.cos(angleSlice * i - Math.PI / 2)).attr("y2", (d, i) => rScale(1.1) * Math.sin(angleSlice * i - Math.PI / 2)).style("stroke", "rgba(255, 255, 255, 0.2)").style("stroke-width", "0.5px");
+            svg.selectAll(".axis-label").data(data).enter().append("text").attr("x", (d, i) => rScale(1.2) * Math.cos(angleSlice * i - Math.PI / 2)).attr("y", (d, i) => rScale(1.2) * Math.sin(angleSlice * i - Math.PI / 2)).text(d => d.axis).style("fill", "white").style("font-size", "10px").style("text-anchor", "middle").style("dominant-baseline", "middle");
+            const radarLine = d3.lineRadial().angle((d, i) => i * angleSlice).radius(d => rScale(d.value)).curve(d3.curveLinearClosed);
+            svg.append("path").datum(data).attr("d", radarLine).style("fill", "rgba(255, 255, 255, 0.5)").style("stroke", "white").style("stroke-width", "2px");
+        }
+        function drawHrvChart(data) { // Akzeptiert jetzt Daten
+            const container = d3.select("#hrv-chart");
+            container.selectAll("*").remove();
+            
+            if (!data || data.length === 0) return; // Schutz
+            
+            const parseTime = d3.timeParse("%H:%M");
+            const processedData = data.map(d => ({ time: parseTime(d.time), value: d.value }));
+            
+            const parent = container.node().parentElement;
+            const width = parent.clientWidth || 300;
+            const height = parent.clientHeight || 256;
+            const margin = { top: 10, right: 10, bottom: 30, left: 30 };
+            const innerWidth = width - margin.left - margin.right;
+            const innerHeight = height - margin.top - margin.bottom;
+            if (innerWidth <= 0 || innerHeight <= 0) return;
+            const svg = container.attr("viewBox", `0 0 ${width} ${height}`).attr("preserveAspectRatio", "xMidYMid meet").append("g").attr("transform", `translate(${margin.left}, ${margin.top})`);
+            const xScale = d3.scaleTime().domain(d3.extent(processedData, d => d.time)).range([0, innerWidth]);
+            const yScale = d3.scaleLinear().domain([25, 100]).range([innerHeight, 0]);
+            const xAxis = d3.axisBottom(xScale).ticks(d3.timeHour.every(4)).tickFormat(d3.timeFormat("%H:%M"));
+            const yAxis = d3.axisLeft(yScale).ticks(4);
+            svg.append("g").attr("transform", `translate(0, ${innerHeight})`).call(xAxis).attr("class", "text-gray-500 text-xs").call(g => g.select(".domain").remove());
+            svg.append("g").call(yAxis).attr("class", "text-gray-500 text-xs").call(g => g.select(".domain").remove()).call(g => g.selectAll(".tick line").attr("x2", innerWidth).attr("stroke-dasharray", "2,2").attr("stroke", "#e5e7eb"));
+            const area = d3.area().x(d => xScale(d.time)).y0(innerHeight).y1(d => yScale(d.value)).curve(d3.curveMonotoneX);
+            svg.append("path").datum(processedData).attr("fill", "rgba(239, 68, 68, 0.1)").attr("d", area);
+            const line = d3.line().x(d => xScale(d.time)).y(d => yScale(d.value)).curve(d3.curveMonotoneX);
+            svg.append("path").datum(processedData).attr("fill", "none").attr("stroke", "#ef4444").attr("stroke-width", 2).attr("d", line);
+        }
+    </script>
+</body>
+</html>
